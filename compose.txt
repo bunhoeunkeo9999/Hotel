@@ -1,2 +1,11 @@
-docker compose build
-docker compose up -d
+cd "C:\Your\Path\Hotel"
+docker compose up --build -d
+docker compose logs -f
+docker compose ps
+
+
+# Test endpoints:
+curl http://localhost:8080/api/rooms
+curl http://localhost:8081/api/housekeeping/tasks
+curl http://localhost:8082/api/guests
+curl http://localhost:8083/

@@ -1,0 +1,99 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hotel-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: hoteldb
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - hotel-mysql-data:/var/lib/mysql
+
+  room-service:
+    build:
+      context: ./room
+    image: hotel-room:local
+    container_name: hotel-room-service
+    environment:
+      MYSQL_HOST: mysql
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root1234
+    ports:
+      - 8080:8080
+    depends_on:
+      - mysql
+    command: ["sh", "-c", "until mysqladmin ping -h mysql -uroot -proot1234; do sleep 2; done; java -jar /app.jar"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/rooms >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  housekeeping-service:
+    build:
+      context: ./housekeeping
+    image: hotel-housekeeping:local
+    container_name: hotel-housekeeping-service
+    environment:
+      MYSQL_HOST: mysql
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root1234
+    ports:
+      - 8081:8080
+    depends_on:
+      - mysql
+    command: ["sh", "-c", "until mysqladmin ping -h mysql -uroot -proot1234; do sleep 2; done; java -jar /app.jar"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/housekeeping/tasks >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  record-service:
+    build:
+      context: ./record
+    image: hotel-record:local
+    container_name: hotel-record-service
+    environment:
+      MYSQL_HOST: mysql
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root1234
+    ports:
+      - 8082:8080
+    depends_on:
+      - mysql
+    command: ["sh", "-c", "until mysqladmin ping -h mysql -uroot -proot1234; do sleep 2; done; java -jar /app.jar"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/guests >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  api-gateway:
+    build:
+      context: ./gateway
+    image: hotel-gateway:local
+    container_name: hotel-api-gateway
+    ports:
+      - 8083:8083
+    depends_on:
+      room-service:
+        condition: service_healthy
+      housekeeping-service:
+        condition: service_healthy
+      record-service:
+        condition: service_healthy
+
+volumes:
+  hotel-mysql-data:
